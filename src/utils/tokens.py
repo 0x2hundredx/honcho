@@ -8,7 +8,18 @@ from src.telemetry.prometheus.metrics import (
     TokenTypes,
 )
 
-tokenizer = tiktoken.get_encoding("o200k_base")
+_tokenizer: tiktoken.Encoding | None = None
+
+
+def _get_tokenizer() -> tiktoken.Encoding | None:
+    """Lazily load the tiktoken encoding to avoid network I/O at import time."""
+    global _tokenizer
+    if _tokenizer is None:
+        try:
+            _tokenizer = tiktoken.get_encoding("o200k_base")
+        except Exception:
+            return None
+    return _tokenizer
 
 
 def estimate_tokens(text: str | list[str] | None) -> int:
@@ -17,6 +28,9 @@ def estimate_tokens(text: str | list[str] | None) -> int:
         return 0
     if isinstance(text, list):
         text = "\n".join(text)
+    tokenizer = _get_tokenizer()
+    if tokenizer is None:
+        return len(text) // 4
     try:
         return len(tokenizer.encode(text))
     except Exception:
